@@ -1,0 +1,363 @@
+---
+title: "Tidy and clean the height data for NLSY '79"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+# Introduction
+
+The purpose of this assignment is to tidy and clean the height data for respondents to NLSY '79 for all available years. Tidying the data is necessary because a person's height is recorded with different variables for each survey year. In this form, it is cumbersome, for example, to plot trends in height for individual teens as they aged. For this dataset, "cleaning" the data will refer to identifying values that represent missing values, or values that appear to be erroneously recorded. More on that below.
+
+```{r}
+library(tidyverse)
+```
+
+# Import and inspect supplied data on height (the early years)
+
+Included with this assignment, is a file named `height_data_early.RData`. Import this data as follows.
+
+```{r}
+load("height_data_early.RData")
+```
+
+```{r}
+glimpse(height_data_early)
+```
+
+There are three variables. `CASEID` is an integer code for the individual surveyed. `height` is recorded as a single variable, apparently as inches, perhaps with `NA` values. `year` is an integer. 
+
+
+
+
+# Specific instructions for this project assignment
+
+Your assignment is to use the data on height that you imported from your downloads to create a tibble named `height_data_late` with the following properties.
+
+1. `height_data_late` has 3 variables with the same names and modes as `height_data_early`. 
+2. `height_data_late$CASEID` contains the integer codes for the survey respondents.     
+3. `height_data_late$year` contains the year of the data, as an integer.    
+4. `height_data_late$height` contains the height of the respondents in inches, as an integer.     
+5. Any values indicating missing values of height are represented as `NA` in `height_data_late$height`.   
+6. Any values of height data that you judge to not be the true heights of the respondents (outliers) are recorded as `NA` in `height_data_late$height`.    
+7. In meeting requirement 6, give an explanation of your reasoning for declaring a value or group of values as an outlier.    
+
+Step by step instructions to carry out these steps are given below.
+
+# 1) Inspect the distributions of variables in early height data
+
+Below, perform the following tasks to gain insight into the distributions of the variables.  This will help guide your work on the remaining height data.
+
+### 1.1 - 2 points
+Write the r code to identify the unique years for which data is available in `height_data_early`.  
+
+#### Your work:
+```{r}
+years<-unique(height_data_early$year)
+years
+```
+
+### 1.2 - 2 points
+Restricting data to the first year for which data is available, use the `summary` function to report the quantiles and extreme values of height, and plot a histogram of height, to gain more insight into the distribution. (You will not be graded on your choice of binwidth.)
+
+#### Your work:
+```{r}
+first_year<-height_data_early%>%filter(year==years[1],!is.na(height))
+first_year%>%summary()
+ggplot(
+  data = first_year,
+  aes(height)
+)+ geom_histogram(binwidth = 1)
+```
+
+## Note on coding of missing values
+
+Within the details on recording of data on the NLSY '79 web site is an explanation of how missing values are coded. For the height variable and others, negative numbers -5 to -1 code for values that are missing for one of 5 reasons. For our purposes, it is better to code all missing values as `NA`, as done in the `height_data_early` dataset.  You will do this in the next section.
+
+# 2) Import the downloaded raw data 
+
+In part A of the project, you were asked to download as a .csv file the height data available for years between 2006 and 2014. You weere also asked to copy from a Web page a table explaining the data contained in the variables (a data dictionary). 
+
+### Upload data to Vocareum
+
+To begin, upload these .csv files to your "work" directory in Vocareum, using the following instructions.
+
+"Starting in the RStudio environment for the assignment, select the menu item **Action -> Standard**. (The Action menu is on the upper right.) In this environment, you see a list of directories in the left-hand column. Select the directory titled “work”, this is the working directory for your RStudio work. Next, at the top of the column of directories, select the button labeled **Upload**. Navigate to your file and upload. When completed, select **Action -> RStudio** to return to the RStudio environment. Check that the file you uploaded appears in your file pane in RStudio."
+
+### 2.1 - Import height data into R (5 points)
+
+Import the height data using `read_csv`. This should result in a tibble; called `raw_height_df`. `glimpse` applied to my version shows the structure reproduced in the following image.   If your data download included other columns, you need to delete them, either in the .csv file (prior to importing) or using `select` on the tibble to drop those columns. Be sure that all 11 variables listed above are present in your final tibble.
+
+![All Height Data](./glimpse_all_ht.png)
+
+#### Your work:
+```{r}
+raw_height_df<-read_csv("Project1data.csv")%>%select(R0000100,T0897400:T4892900)
+glimpse(raw_height_df)
+```
+
+### 2.2 - Import height data dictionary into R (5 points) 
+ 
+Next, import the data dictionary .csv file, saving the result as a tibble, named, `height_dict`. When I performed this step, I recieved a tibble with the following structure.  Notice that my call to `read_csv` assigned the default column names (X1 to X4), since in my .csv file, no column names were specified.  Provide descriptive column names ("Variable_code", "Q_code", "Description", "year") for `height_dict`.
+
+![Height Data Dictionary](./glimpse_dict.png)
+
+#### Your work:
+```{r}
+height_dict<-read_csv("height_index.csv",col_names = F)%>%rename(Variable_code=X1,Q_code=X2,Description=X3,year=X4)
+```
+
+
+### 2.3 - Clean up coding of missing values in raw_height_df (5 points)
+Transform the raw height data so that any value they have represented as missing is coded with an `NA`. Store the updated result back in `raw_height_df`.
+
+#### Your work:
+```{r}
+raw_height_df$T0897400[raw_height_df$T0897400<0]<-NA
+raw_height_df$T0897500[raw_height_df$T0897500<0]<-NA
+raw_height_df$T2053900[raw_height_df$T2053900<0]<-NA
+raw_height_df$T2054000[raw_height_df$T2054000<0]<-NA
+raw_height_df$T3024800[raw_height_df$T3024800<0]<-NA
+raw_height_df$T3024900[raw_height_df$T3024900<0]<-NA
+raw_height_df$T3955100[raw_height_df$T3955100<0]<-NA
+raw_height_df$T3955200[raw_height_df$T3955200<0]<-NA
+raw_height_df$T4892800[raw_height_df$T4892800<0]<-NA
+raw_height_df$T4892900[raw_height_df$T4892900<0]<-NA
+```
+
+
+# 3 - Tidy the data
+
+The data dictionary indicates that for these years, the height of an individual was recorded with two variables, one for feet and one for inches. Inspection of a few random rows in `raw_height_df` shows that the feet variables are normally 4, 5, or 6, and the inches variables, are integers between 0 and 11. Also, the height in feet readings are coded with different variables for different years -- this data is untidy.   
+
+To transform the data into the form that matches the early height data we need to 
+
+*  tidy the height in feet variables;    
+*  tidy the height in inches variables;     
+*  combine these to compute a single height variable;    
+*  perform any remaining clean-up of outliers.
+
+### 3.1 - Separate height in feet and height in inches (5 points)
+
+Tidying the data on both feet and inch readings will go most smoothly if we create separate tibbles for each class of measurements. After tidying the data we will re-combine (join) them into a single tibble.   
+
+Use the dictionary to identify the variable codes that correspond to height in feet readings. Create a tibble `raw_ht_feet_df` that contains the data on the height in feet variables and the variable for CASEID (R0000100). Repeat this process to also create `raw_ht_inches_df`.
+
+#### Your work:
+```{r}
+raw_ht_feet_df<-raw_height_df%>%select(R0000100,T0897400,T2053900,T3024800,T3955100,T4892800)
+raw_ht_inches_df<-raw_height_df%>%select(-T0897400,-T2053900,-T3024800,-T3955100,-T4892800)
+
+```
+
+
+### 3.2 - Tidy the height in feet variables  (5 points) 
+
+We now have a tibble containing exclusively the data on height in feet. Use tidyverse's `gather` to create a tibble, `tidy_height_feet`, with all values of height in feet given in the variable `height_feet`, and the variable codes in the variable `feet_variables`. 
+
+#### Your work:
+```{r}
+tidy_height_feet<-gather(raw_ht_feet_df,key = feet_variables,value = height_feet,T0897400:T4892800)
+```
+
+
+### 3.3 - Tidy the height in inches data (5 points)
+
+We have a tibble containing exclusively the data on height-inches. Use tidyverse's `gather` to create a tibble, `tidy_height_inches`, with all values of height in inches given in the variable `height_inches`, and the variable codes in the variable `inches_variables`. 
+
+#### Your work:
+```{r}
+tidy_height_inches<-gather(raw_ht_inches_df,key = inches_variables,value = height_inches,T0897500:T4892900)
+```
+
+
+### 3.4 - Associate height in feet records with a year (5 points)
+
+In `tidy_height_feet`, for each individual there are five records, one corresponding to each variable. Each variable represents height in feet for a particular year. In order to associate height in feet and height in inches readings we need to identify the correct year for each. In this step, use the dictionary tibble to add a variable `year` to `tidy_height_feet`, creating `tidy_height_feet2` that identifies the year corresponding to each variable. Then, remove the `feet_variables` variable from `tidy_height_feet2`. `tidy_height_feet2` should have the columns `R0000100`, `height_feet` and `year`.
+
+#### Your work:
+```{r}
+tidy_height_feet2<-merge(tidy_height_feet,height_dict,by.x = "feet_variables",by.y="Variable_code")%>%select(-feet_variables,-Q_code,-Description)
+```
+
+
+### 3.5 - Associate height in inches records with a year (5 points)
+
+Repeat the preceding work for `tidy_height_inches` to produce `tidy_height_inches2` that has each record associated with an individual and a year. `tidy_height_inches` should also have 3 variables, `R0000100`, `height_inches`, `year`.
+
+#### Your work:
+```{r}
+tidy_height_inches2<-merge(tidy_height_inches,height_dict,by.x = "inches_variables",by.y="Variable_code")%>%select(-inches_variables,-Q_code,-Description)
+```
+
+
+
+### 3.6 - Join feet and inch data (8 points)
+
+Now, you have tidy data frames for the height-feet readings and the height-inches readings for each individual and each survey year. Join these into a single tibble called `tidy_height_data`. It should have the columns, `R0000100`, `height_feet`, `height_inches`, `year`. 
+
+#### Your work:
+```{r}
+tidy_height_data<-inner_join(tidy_height_feet2,tidy_height_inches2,c("R0000100","year"))%>%select(R0000100,height_feet,height_inches,year)
+```
+
+
+# 4 - Identify outliers and suspect values
+
+Take a breath and congratulate yourself. Having the data in this tidy form is a big accomplishment. From here it's largely a matter of cleaning up outliers. Also, we need to calculate height from the feet and inches components, but that's simple, if the data doesn't have outliers.
+
+# Explore the height and inch data for unexpected values
+
+Our search for outliers reduces to inspecting the feet and inch variables for unexpected values. We already replaced negative numbers by `NA`. The remaining values are intended to represent real data; we need to judge if they do.
+
+### 4.1 - Inspect values of the height_feet variable (2 points)
+
+For inspecting these variables we don't need to separate by year, but just look for weird values anywhere. For the feet variable, there should only be 3 or 4 non-NA values.
+
+For a detailed inspection, compute and print out all unique values of `height_feet`.
+
+#### Your work:
+```{r}
+unique(tidy_height_data$height_feet)
+```
+
+
+### 4.2 - Inspect values of the height_inches variable (2 points)
+
+The `height_inches` variable should have values 0 to 11. As with feet, compute and print out all unique values of the variable.
+
+#### Your work:
+```{r}
+unique(tidy_height_data$height_inches)
+```
+
+
+# 5 - Isolation and clean-up of the suspect values
+
+You should have discovered in the preceding sections that there are some values of these variables that don't match our expectations. For some of unexpected values it still may be possible to compute the final height variable. Others, we'll judge to be erroneously recorded, and replace with `NA`. In order to decide that, you should inspect the full records that contain suspect values. 
+
+In this section you should:   
+
+### 5.1 - Define clear criteria (5 points)
+Define clear criteria that identify values of `height_feet` and `height_inches` as suspect. Give brief explanations for your decisions, no R code requried.
+
+#### Your work:
+Suspect Values of height_feet are values that are too short or tall such as 2,3,8 while there could be people that are that height it is very unlikely.
+Suspect Values of height_inches are values that do not fit between 0-12 inches such as the people that look like they put in their full height in the inches box or just put in a random number.
+Other suspect values are values where one of the two values is NA but not both.
+
+
+### 5.2 - Apply criteria to create two new confident and suspect tibbles (8 points)
+Apply your criteria to filter `tidy_height_data` into two new tibbles: `suspect_height_data`, containing the records with suspect values, and `confident_height_data` containing the values that aren't suspect. Include in `confident_height_data` the records for which both `height_feet` and `height_inches` are `NA` (since we are confident we can compute the right value of height for these -- it's `NA`.)
+
+[Important hint: It is difficult to define the right conditions for two `filter` operations that manage to separate every row in `tidy_height_data` into one of two tibbles (`suspect_height_data` or `confident_height_data`). The subtleties are due to combinations of `NA` values. To solve this step, first define  `suspect_height_data`. Then, create `confident_height_data` to consist of every row in `tidy_height_data` not in  `suspect_height_data` by executing the command, 
+
+`confident_height_data <- anti_join(
+  tidy_height_data,
+  suspect_height_data
+  )`
+]
+
+Important: To check your work, check that the number of rows in the two tibbles adds up to the number in `tidy_height_data`.
+
+#### Your work:
+```{r}
+suspect_height_data<-tidy_height_data%>%filter(height_feet<4|height_feet==8|height_inches>12|is.na(height_feet)&!is.na(height_inches)|!is.na(height_feet)&is.na(height_inches))
+confident_height_data <- anti_join(
+  tidy_height_data,
+  suspect_height_data
+  )
+nrow(tidy_height_data)==nrow(suspect_height_data)+nrow(confident_height_data)
+```
+
+
+### 5.3 - Define the height for confident records  (5 points) 
+
+For the records that you are confident are legitimate use the existing variables to add to  `confident_height_data` a new variable, `height`, which represents the full height of a person in inches. Call the new tibble  `height_data_late_part1`. Further transform  `height_data_late_part1` so that the variables are `CASEID`, `year` and `height`, and each are integer vectors, as in `height_data_early`. 
+
+
+#### Your work:
+```{r}
+height_data_late_part1<-confident_height_data%>%mutate(height =height_feet*12+height_inches) %>%select(CaseID = R0000100,height,year)
+```
+
+
+### 5.4 - Make a decision on suspect records (5 points)
+
+Your selection process should have identified a moderate number of suspect records. Here, I'd like you inspect these records, and identify any for which you believe you can  confidently calculate the height. Write at least 2 criteria for identifying these records and computing the height for these records. Records that do not satisfy these criteria are considered ERRONEOUS. For the latter, the `height` variable will be `NA`.
+
+To carry out this inspection, it's helpful to view the entire `suspect_height_data` tibble. I suggest clicking on this tibble in RStudio's Environment pane to load this into the spreadsheet-like viewer in RStudio's source pane.   
+
+Note: It is not 100% clear what the criteria should be. There is one pattern of values that some may say are suspect and others may believe are legitimate. Just state clearly what your criteria are and your reasoning behind them.
+
+#### Your Work (write down your criteria and provide an explanation, no R code needed):
+
+Criteria 1: if inches is between 50 and 80 assume they put in their full height in inches
+Criteria 2: if feet is put in but no inches assume that they are exactly that height and didnt put in a zero for inches
+etc..
+
+
+### 5.5 - Act on your criteria to define height for some suspect records (5 points) 
+
+Your goal for this step is to create the tibble  `height_data_late_part2`, which has the same variables as `height_data_late_part1`, with `height` defined, possibly as `NA`, for each record in `suspect_height_data`.  
+
+To carry this out, further filter `suspect_height_data` into separate tibbles containing the records satisfying each of the criteria defined above for determining the height.  Name each tibble df1, df2, etc, to coorispond with your criteria.  Apply your criteria to each tibble to define height for these records. After you also select and rename the variables in the tibbles to match those desired, create a tibble `height_data_late_part2` containing all records in one of the new tibbles.  To carry out this last step, use the `bind_rows` function.
+[To combine tibbles `df1` and `df2` with `bind_rows`, execute `bind_rows(df1, df2)`.]
+
+#### Your work:
+```{r}
+#criteria 1
+df1<-suspect_height_data%>%filter(height_inches>50 &height_inches<80)%>%mutate(height =height_inches)
+#criteria 2
+df2<-suspect_height_data%>%filter(!is.na(height_feet)&is.na(height_inches))%>%mutate(height =height_feet*12) 
+#bind to tibble
+suspect_height_data_keep <-bind_rows(df1,df2)
+#doesnt meet either make NA
+df3<- anti_join(
+  suspect_height_data,
+  suspect_height_data_keep
+  )
+#check that the row numbers stay the same
+nrow(suspect_height_data) == nrow(df3)+nrow(suspect_height_data_keep)
+
+df3_NA<-df3%>%mutate(height =NA)
+height_data_late_part2<-bind_rows(suspect_height_data_keep,df3_NA)%>%select(CaseID = R0000100,height,year)
+```
+
+
+### 5.6 - Combine the two parts of the late height data  (5 points)
+
+You defined height data for two classes of records, giving `height_data_late_part1` and `height_data_late_part2`. Bind these different tibbles into the single tibble, `height_data_late`. Check that `height_data_late` has the desired variables, variable names and variable modes.
+
+#### Your work:
+```{r}
+height_data_late <-bind_rows(height_data_late_part1,height_data_late_part2)
+```
+
+
+# 6.1 - Explore the final heights (8 points)
+
+The last year of the survey is 2014. Plot a histogram of the height data you computed for 2014, with binwidth of your choice.  The histogram should be similar to the one you plotted for the early data. 
+
+### Your work:
+```{r}
+ggplot(
+  data = height_data_late,
+  aes(x = height)
+) + geom_histogram()
+```
+
+
+# 7.1 - Save your tibble to the work directory (3 points)
+
+Execute `save(height_data_late, file = "height_data_late.RData")` in a code chunk to save your final answer.
+
+### Your work:
+```{r}
+save(height_data_late, file = "height_data_late.RData")
+```
+
+
+# SUBMIT
+
+When you are ready, click submit! 

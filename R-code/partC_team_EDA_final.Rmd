@@ -1,0 +1,494 @@
+---
+title: "Final project Part C: Explore factors effecting income in NLSY '79 data"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+```{r}
+library(tidyverse)
+```
+
+# Team members
+
+Please list as follows the members of your team, including yourself.
+
+Member 1: Hunter Kempf  
+Member 2: Charle Lotfolla 
+Member 3: Casey Donnelly   
+
+# Introduction
+
+Many factors effect a person's income over a period of years. Of course, someone's chosen profession is the principle factor. Related to this factor is level of education, since many high-paying professions require a college degree or an additional professional degree. Other factors effecting income may be due to social biases concerning gender, race or physical appearance. 
+
+This analysis includes examination into the education, gender, and height variables in an attempt to explore the relationships they have independently and dependently with income. The analysis was not confined to a specific year, nor did every relationship investigated use data from every year. Instead, for relationships in which it was more appropriate to use a single reference, such as a maximum, that was calculated, and for others where changes over time were more approriate, all years were used. Furthermore, this analysis was confined to working level subjects, with the understanding that working level subjects would have a non-zero income. Prior to using each dataset, tidying and cleaning of the data was performed to eliminate erroneous values, or values that did not make sense in the context of this analysis. 
+
+
+### First Look at Income Variable
+```{r}
+load("income_data_nlsy79.RData")
+glimpse(income_data_nlsy79)
+```
+The income dataset is comprised of three variables: 'CASEID', 'year', and 'income', all reported as integers. CASEID refers to the unique identifier for each subect in the NLSY '79 survey, and year refers to the specific year the information was collected. Income is reported in dollars and reflects the particpants annual salary. 
+
+```{r}
+summary(income_data_nlsy79$income)
+```
+
+The income data has a significant number of NA values, and for the purposes of this analysis we will remove them. As stated in the introduction, we will limit this analysis to working level individuals, and also remove incomes that are equal to zero. 
+
+```{r}
+income_data <- income_data_nlsy79 %>% filter(!is.na(income)) %>% filter(income != 0)
+```
+
+It is important to note that in this study, to prevent substantial skew of the data from top earners, annual salaries reported in the top 2% were grouped together and each subject in that group was assigned a new income that was the minimum value of the top 2%. We understand this value to be $370,314 for 2014. Since these values are grouped, and often times people are grouped into 'classes' (e.g. middle class), we factored the data based on federal guidelines of class. 
+
+```{r}
+income_data <- income_data %>% mutate(income_level=cut(x=income,breaks=c(0,24999,34999,99999,149999,Inf),labels=c("Poverty","Low Income","Middle class","Upper Middle Class","High Income"),ordered_result=T))
+```
+
+Finally, it is often interesting to consider earning potential when considering the relationship between income and other factors. This single reference point is the maximum income a subject has achieved over the span of all the years. We use distinct to ensure that if the subject reported multiple years of the same maximum income, they are only counted once. 
+
+```{r}
+income_data_max <- income_data %>% group_by(CASEID) %>% filter(income == max(income)) %>% distinct(CASEID, .keep_all = T)
+```
+
+To see the distribution of our subjects earning potential into the income brackets, we plot the following graph and summary statistics.
+
+```{r}
+ggplot(
+  data = income_data_max,
+  aes(x = income_level)
+) +
+  geom_bar()+
+  theme_bw()+
+  ggtitle('Distribution of Earning Potential of Subjects per Class')+
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(x = 'Income Level', y = 'Count')
+
+summary(income_data_max$income_level)
+```
+
+### First Look at Education Variable
+```{r}
+load("education_data_nlsy79.RData")
+glimpse(education_data_nlsy79)
+```
+
+The dataset on education is comprised of three variables: 'CASEID', 'year', and 'education'. CASEID and year have been detailed in the income section, and education refers to the highest level of education the subject has completed as of May 1 of that year. 
+
+```{r}
+length(unique(education_data_nlsy79$CASEID))
+length(unique(education_data_nlsy79$year))
+```
+The dataset has 12,686 unique subjects, with values recorded across a span of 26 years.
+
+```{r}
+unique(education_data_nlsy79$education)
+```
+
+The values for education include integers from 0 to 20, 95, and NA. Inspection of the details behind how the data was recorded reveals that the value aligns with grades in school, meaning a recorded value of 12 means the subject has completed the 12th grade, 16 for completed undergraduate, and 20 for completed graduate. A value of 95 refers to an ungraded education. An ungraded education may have different definitions, ranging from a trade school, to a technical certification, to anything not confined in the traditional ladder of education. Due to the lack of detail behind this value and the inconsistency in how it would be applied, we have decided to remove it from our analysis. Furthermore, many subjects have multiple years of NA recorded as their education value, these values will not be considered for our analysis. 
+
+```{r}
+edu_data <- education_data_nlsy79 %>% filter(education != 95) %>% filter(!is.na(education))
+```
+
+Education statistics are often grouped together by level of education, meaning subjects who have completed 9, 10, 11, or 12th grades fall into the 'High School' level, subjects who have completed 13, 14, 15, or 16 fall into the 'Undergraduate' level, and so on. Therefore we factored the education variable into grade school (0:8], high school (8,12], undergraduate (12,16], and graduate levels (16,20]. 
+
+```{r}
+edu_data <- edu_data %>% mutate(education_level = cut(education, breaks = c(-1,8,12,16,20), labels = c('Grade School', 'High School', 'Undergraduate', 'Graduate')))
+```
+
+Finally, since the level of education is an increasing function and cannot decrease year over year, we consider the max value of education per subject when relating it to other values such as income/earnings. It is noted that the most participants have completed some of high school or undergraduate, with fewer completing graduate, and a relatively small sample only completing grade school. 
+
+```{r}
+edu_data_max <- edu_data %>% group_by(CASEID) %>% filter(education == max(education, na.rm = TRUE)) %>% summarize(education_level = first(education_level))
+
+summary(edu_data_max$education_level)
+```
+
+
+### First Look at Height Variable 
+
+```{r}
+load("physical_data_nlsy79.RData")
+physical_data <- physical_data_nlsy79
+glimpse(physical_data_nlsy79)
+```
+The physical dataset is comprised of 9 variables: 'CASEID','weight', 'year','eyes','hair','race','sex','height' and 'BMI', reported as characters for eyes, hair, race and sex, integers for CASEID, weight, year and height and finally BMI as a double. CASEID refers to the unique identifier for each subect in the NLSY '79 survey, and year refers to the specific year the information was collected. Weight is in lbs, height is in inches and BMI is in kg/m^2.
+
+```{r}
+length(unique(physical_data_nlsy79$CASEID))
+length(unique(physical_data_nlsy79$year))
+```
+The dataset has 12,686 unique subjects, with values recorded across a span of 20 years.
+
+```{r}
+length(unique(physical_data_nlsy79$height))
+sort(unique(physical_data_nlsy79$height))
+```
+The height variable has 39 unique values and with the shortest height of 48 inches and the tallest height of 91 inches and some as NA values
+
+We can see that the general distribution of the histogram below follows a relatively normal distribution, though some height values do have substantially higher counts within the distribution.
+
+```{r}
+ggplot(
+  data = physical_data_nlsy79,
+  aes(x = height)
+)+geom_histogram(bins = 30)+
+  ggtitle("Distribution of Height Values")+
+  labs(x = 'Height (inches)', y = 'Count')+
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+For our analysis we will filter out the NA values of height
+```{r}
+height_data <- physical_data_nlsy79 %>% filter(!is.na(height))
+```
+
+We will also create a data set with only the maximum height of an individual, which we can now see the heights range from 55 to 91 inches 
+```{r}
+physical_data_max_h <- height_data%>%group_by(CASEID)%>%filter(height==max(height))%>%select(CASEID,height) %>% mutate(height_bucket_big=cut(x=height,breaks=c(0,60,65,70,Inf),labels=c("<=60","60-65","66-70",">71"),ordered_result=T))
+
+summary(physical_data_max_h)
+
+```
+
+To get some deeper understanding of the height variable later on it will be useful to classify heights into buckets that will allow us to use graphs like box plots to show general height trends this will be done with small and large buckets to allow for different types of graphs
+
+```{r}
+phys_with_height_buckets<-height_data%>%
+  mutate(height_bucket_small=cut(x=height,breaks=c(0,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,Inf),labels=c("<=60","61","62","63","64","65","66","67","68","69","70","71","72","73","74","75",">75"),ordered_result=T))%>%
+  mutate(height_bucket_big=cut(x=height,breaks=c(0,60,65,70,Inf),labels=c("<=60","60-65","66-70",">71"),ordered_result=T))
+
+summary(phys_with_height_buckets$height_bucket_small)
+summary(phys_with_height_buckets$height_bucket_big)
+```
+
+### First Look at Sex Variable 
+```{r}
+load("physical_data_nlsy79.RData")
+glimpse(physical_data_nlsy79)
+```
+
+The variables contained within this file are the same as detailed in the height analysis section. To understand what values the variable sex contains, the function unique is used to see if there is any erroneous data other than male & female. 
+
+```{r}
+unique(physical_data_nlsy79$sex)
+```
+
+As seen above, there is no missing or erroneous data in the sex variable. Now using a factor of the variable sex would help understand the number of males versus female surveyed. 
+
+```{r}
+sex_factor <- as.factor(physical_data_nlsy79$sex)
+summary_sex <- summary(sex_factor)
+summary_sex
+```
+
+This shows a roughly equal distribution. To check the accuracy of the data, dividing the number of males and females in the factor by the number of years and then adding them together should be similar to the lenght of the unique CASEID.
+
+```{r}
+Total_candidates <- sum(summary_sex/length(unique(physical_data_nlsy79$year)))
+Total_candidates == length(unique(physical_data_nlsy79$CASEID))
+```
+
+This means that all the data in the sex variable is valid data with no bad entries or erroneous variables.
+
+
+
+### Education vs Income
+
+Let's first look at the distribution of income potential over the different education levels. We remove outliers for plotting purposes, and overlay the means of each group on the boxplot in blue. 
+
+```{r}
+income_vs_education_max <- inner_join(edu_data, income_data_max)
+ggplot(
+  data = income_vs_education_max,
+  aes(x = education_level, y = income, fill = education_level)
+) +
+  geom_boxplot(outlier.shape = NA) +
+  stat_summary(fun.y=mean, colour="blue", geom="line", size = 1, aes(group=1))+
+  labs(x = 'Education Level', y = 'Income ($)') +
+  scale_fill_brewer(palette="Pastel2")+
+  theme_bw()+
+  theme(legend.position = 'none')+
+  ylim(0,150000)+
+  ggtitle('Income Statistics by Education Level')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+income_vs_education_max %>% group_by(education_level) %>% summarize(n = n(), mean = mean(income))
+```
+
+It is clear that with higher education comes higher earning potential, the next question to ask is does this relationship hold true when looking at the composition of education levels within the various incomes levels? 
+
+```{r}
+ggplot(
+  data = income_vs_education_max,
+  aes(x = income_level, fill = education_level)
+) +
+  geom_bar(position = 'fill')+
+  labs(x = 'Income Level', y = 'Percentage', fill = 'Education Level')+
+  theme_bw()+
+  ggtitle('Income Level Composition by Education Level')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+The relationship of higher education correlating to higher income is shown again, as higher income levels are comprised of a higher percentage of subjects who have completed some undergraduate or graduate education. Since we are looking only at maximums, it would be interesting to understand if a higher education degree means the same tody as it has in the past? It has been stated on news outlets that today's undergraduate degrees are worth the same as a high school education 30 years ago. Is that really true? To understand this we look at average earnings per education level over the years of survey.
+
+```{r}
+income_vs_education <- merge(edu_data,income_data)
+ggplot(
+  data = income_vs_education %>% group_by(education_level,year)
+ %>% mutate(mean_level = mean(income, rm.na = TRUE)),
+ aes(x = year, y = mean_level, color = education_level)
+) +
+  geom_point() +
+  labs(x = 'Year', y = 'Average Income ($)', color = 'Education Level') +
+  geom_smooth() +
+  theme_bw()+
+  ggtitle('Education Level vs. Average Income')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Based on this chart, it appears that higher education provides higher incomes across all years, and that the difference in pay grows larger, not smaller, as the years progress. Spun another way, a bachelors degree is worth even more than it was 30 years ago! To substantiate the claim this claim even further, we examine the rate of increase of income for each of the education levels by plotting the logarithm of the same data as above. 
+
+```{r}
+ggplot(
+  data = income_vs_education %>% group_by(education_level,year)
+ %>% mutate(mean_level = mean(income, rm.na = TRUE)),
+ aes(x = year, y = log(mean_level), color = education_level)
+) +
+  geom_point() +
+  theme_bw()+
+  labs(x = 'Year', y = 'Log(Average Income ($))', color = 'Education Level') +
+  geom_smooth() +
+  ggtitle('Education Level vs. Log of Average Income')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+This plot confirms that the increase in pay between each education level continues to grow, especially in the past 10 years when comparing undergraduate educations to high school educations. It may be worth further analysis to understand why post 2010, each rate of increase remains relatively flat. Are wages across all education levels stagnant?
+
+
+### Height vs Income
+Let's first look at the distribution of income potential over the different height levels. The Blue line shows the trend line and the red line shows the median for the data set.
+
+```{r}
+#Join the data
+income_vs_height_buckets<-inner_join(phys_with_height_buckets,income_data, by = c('CASEID', 'year'))
+
+income_vs_height_buckets_2014<- inner_join(phys_with_height_buckets,income_data,by = c("CASEID", "year")) %>%
+  filter(year=="2014",income<2e5)
+
+h = median(income_vs_height_buckets_2014$income)
+
+ggplot(
+  data=income_vs_height_buckets_2014,
+  aes(x=height_bucket_small,y=income)
+)+geom_boxplot()+ theme_bw()+ theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(hjust = 0.5))+ geom_hline(aes(yintercept = h),color = "red")+ geom_smooth(method = lm,aes(group = 1))+ ggtitle("Height vs Income in 2014")+ labs(y="Income ($)",x="Height (inches)") 
+```
+
+This shows that Height and Income are positively correlated. The taller a person is the more money they make as shown by the "Height vs Income in 2014" graph. The year 2014 was used to show a mature career. We can see that people under 5'7" on average will make less than the median but people 5'8" and above will on average make more than the median.  Note: This graph removed indivduals making over 200k to avoid statistics being skewed by a few high earners
+
+Next we look at how height affected income over time
+
+```{r}
+ggplot(
+  data = income_vs_height_buckets %>% group_by(height_bucket_big,year)
+ %>% mutate(mean_level = mean(income, rm.na = TRUE)),
+ aes(x = year, y = log(mean_level), color = height_bucket_big)
+) +
+  geom_point() +
+  theme_bw()+
+  labs(x = 'Year', y = 'Log( Average Income ($) )', color = 'Height') +
+  geom_smooth(method = loess)+
+  ggtitle('Log of Average Incomes over Time')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Evident by the graph above, the difference among average incomes for the various height ranges is evident throughout the duration of the survey.
+
+Unsurprisingly the 66-70 and >71 groups make up larger parts of the higher income brackets 
+
+```{r}
+income_max_vs_height_max<-inner_join(physical_data_max_h,income_data_max, by = 'CASEID')
+ggplot(
+  data = income_max_vs_height_max,
+  aes(x = income_level, fill = height_bucket_big)
+) +
+  geom_bar(position = "fill")+
+  labs(x = 'Income Level', y = 'Percentages', fill = 'Height Level')+
+  theme_bw()+ggtitle("Maximum Income and Maximum Height Distributions")+theme(plot.title = element_text(hjust = 0.5))
+
+income_max_vs_height_max %>% group_by(height_bucket_big) %>% summarize(n = n(), mean = mean(income))
+```
+
+As we can see the height of a person is strongly correlated with their salary level. 
+
+### Gender vs Income
+To investigate the relationship between gender and income, we first join the two datasets.
+
+```{r}
+sex_data <- inner_join(physical_data, income_data) %>% select(year, sex, income, CASEID)
+```
+We then group by sex and year, and calculate the average income to understand first the average income of each sex, and to analyze how this value changes over time for the length of this study.
+
+```{r}
+ggplot(
+  data = sex_data %>% group_by(year, sex) %>% summarize(avg_income = mean(income)),
+  aes(x = year, y = avg_income, color = sex)
+) +
+  geom_point() +
+  geom_smooth() + ggtitle("Average Income for Males and Females by year")  + ylab ("Average Income")
+```
+
+It is apparent by this plot that males receive a higher income than females. To further analyze this, we calculate the difference in income per year between males and females, and plot it. 
+
+```{r}
+income_diff <- sex_data %>% group_by(year, sex) %>% summarize(avg_income = mean(income)) %>%
+  group_by(year) %>%
+  summarise(income_diff1 = avg_income[sex == "male"] - avg_income[sex == "female"])
+
+ggplot(
+  data = income_diff,
+  aes(x = year, y = income_diff1)
+) +
+  geom_point() +
+  geom_smooth() + 
+  ggtitle("Income Difference between Males & Females by Year") +  
+  ylab("Income Difference ($)")+
+  xlab('Year')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+This plot shows that the income difference between males and females exists and continues to grow throughout time based on the raw value of average income. To further investigate the statistical significance of this difference, we perform the following analysis.
+
+```{r}
+max_income_sex <- sex_data %>% group_by(CASEID, sex) %>% summarise(max_income = max(income)) 
+
+mean_male <- mean(filter(max_income_sex, sex == "male")$max_income)
+mean_female <- mean(filter(max_income_sex, sex == "female")$max_income)
+std_male <- sd(filter(max_income_sex, sex == "male")$max_income)
+std_female <- sd(filter(max_income_sex, sex == "female")$max_income)
+n_male <- length(max_income_sex$sex[max_income_sex$sex == "male"])
+n_female <- length(max_income_sex$sex[max_income_sex$sex == "female"])
+
+Stats <- c(mean_male, mean_female, std_male, std_female, n_male, n_female)
+names(Stats) <- c('Mean Male', 'Mean Female', 'StD Male', 'StD Female', 'Number Male', 'Number Female')
+Stats
+```
+
+To visualize this data, we plot the following graphs. 
+
+```{r}
+# Convert values from above into text that can be displayed on a graph 
+dat_text <- data.frame(
+  mean   = c(as.integer(mean_female), as.integer(mean_male)),
+  std    = c(as.integer(std_female), as.integer(std_male)),
+  n = c(n_female, n_male)
+)
+dat_text$label <- sprintf(
+  "n = %s\nmean = %s\nstd. dev. = %s",
+  dat_text$n,
+  dat_text$mean,
+  dat_text$std
+)
+
+ggplot(
+  data = max_income_sex,
+  aes(x = max_income)
+) +
+  geom_histogram(bins = 20)  + 
+  facet_grid(~sex)+ annotate("text", x   =250000,
+    y   = 1800, label = dat_text$label) + 
+  ggtitle("Distribution of Maximum Income per Person, by Gender") +  
+  ylab ("Number of People") + 
+  xlab("Maximum Income per Person ($)") +
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The purpose of these facets is to compare the maximum salary reached by each male and female in their career which might give some information about the distribution of different gender candidates over different pay ranges. As seen in the facets, female maximum salaries have a mean of around 38K while male maximum salaries have a mean of around 61K. The reason behind this could be either that female work in industries that pay lower salaries than those of the male's or could be the an actual gender salary gap in same industries. Standard deviations of 41K for female salaries and $71K for male salaries could explain how male salaries are more diverse than female salaries which might provide some insight on how males work in more industries with that have a wider range of salaries while females work in less industries with a lower salary diversity.
+
+### Joint Relationships among Height, Gender, Education
+
+To understand the dependencies among these three variables, we first look at height and education. We use the maximum value for height and the highest level of education achieved to see if they are correlated.
+
+```{r}
+edu_vs_height <- inner_join(edu_data_max, physical_data_max_h)
+ggplot(
+  data = edu_vs_height,
+  aes(x = education_level, y = height, fill = education_level)
+) +
+  geom_boxplot()+
+  stat_summary(fun.y=mean, colour="blue", geom="line", size = 1, aes(group=1))+
+  scale_fill_brewer(palette="Pastel2")+
+  labs(x = 'Education Level', y = 'Height (inches)')+
+  theme_bw()+
+  theme(legend.position = 'none')+
+  ggtitle('Boxplot of Education Level vs. Height')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The plot above shows us that there is no apparent relationship between someones education level and their height. Next we explore the education and sex variables. 
+
+```{r}
+edu_vs_sex <- inner_join(edu_data_max, sex_data)
+ggplot(
+  data = edu_vs_sex,
+  aes(x = education_level, fill = sex)
+) +
+  geom_bar(position = 'fill')+
+  labs(x = 'Education Level', y = 'Percentage')+
+  ggtitle('Distribution of Sex among Education Levels')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+A bar plot of the distribution shows that as level of education increases, the percentage of females increases. Reworded, it means that a higher percentage of females attend undergraduate and graduate schools as opposed to males. 
+
+```{r}
+sex_vs_height <- inner_join(physical_data_max_h, sex_data, by = 'CASEID')
+ggplot(
+  data = sex_vs_height,
+  aes(x = sex, y = height, fill = sex)
+) +
+  geom_boxplot() +
+  theme_bw()+
+  labs(x = 'Sex', y = 'Height (inches)')+
+  ggtitle('Boxplot of Sex vs. Height')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+This plot shows a clear difference between the distribution of heights between males and females, as males are systematically taller. This sheds light on an earlier relationship that was identified - that taller people will make more money. Does this instead mean that males, who are taller, will make more money? As a final investigation, we compare the income distribution of males vs females for the similar heights.
+
+```{r}
+gender_height_income <- inner_join(income_max_vs_height_max, sex_data, by = c("CASEID", "income", "year"))
+ggplot(
+  data = gender_height_income,
+  aes(x = height_bucket_big, y = income, fill = sex)
+) +
+  geom_boxplot()+
+  ylim(0,150000) +
+  labs(x = 'Height (inches)', y = 'Income ($)')+
+  ggtitle('Boxplot of Max Height vs. Max Income')+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Suprisingly, the plot above shows that for lower height ranges, males and females are comporable in their earnings potential. However, as height increases, there is a clear difference between the earnings potential, as males make more than females, and do so at a greater amount. 
+
+
+### Conclusions/Hypotheses 
+
+Based off the above analysis, we define the following hypotheses which, with more time and data, should be further investigated:
+
+1. The strongest determining factor for earning potential is education, with higher education resulting in higher earnings.
+
+2. Gender and earning potential are strongly correlated, with men earning more than women. However, this may be confounded by their profession, which is not available in the provided dataset.
+
+3. Height and earning potential are strongly correlated, with taller subjects earning more money than their shorter counterparts.
+
+4. For subjects of equivalent height, males out earn females with a clear upward trend starting at around 66 inches in height. This leads us to the conclusion that you will have the highest probability of a high earnings potential if you are a tall male. 
+
+
+ 
+
+
+
